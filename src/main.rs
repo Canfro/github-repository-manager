@@ -256,7 +256,15 @@ fn remove_package(
 
     for binary_string in package_config.binaries_path {
         let binary_file = PathBuf::from_str(&binary_string)?;
-        remove_file(binary_file)?;
+        let binary_status = Command::new("sudo")
+            .arg("rm")
+            .arg("-r")
+            .arg(binary_file)
+            .status()?;
+
+        if !binary_status.success() {
+            return Err("Failed to remove file with sudo".into());
+        }
     }
 
     remove_file(state_root.join(format!("{}-{}.json", owner, repo)))?;
