@@ -119,8 +119,6 @@ pub async fn sync_package(
     }
 
     let release = fetch_latest_release(&owner, &repo).await?;
-    let tag_name = release.0;
-    let tarball = release.1;
 
     let cache_dir = cache_root.join(format!("{}-{}", owner, repo));
 
@@ -130,7 +128,7 @@ pub async fn sync_package(
     create_dir_all(cache_dir.as_path())?;
 
     // Extract the tarball
-    let mut archive = Archive::new(GzDecoder::new(Cursor::new(tarball)));
+    let mut archive = Archive::new(GzDecoder::new(Cursor::new(release.tarball_bytes)));
     archive.set_overwrite(true);
     archive.unpack(cache_dir.as_path())?;
 
@@ -168,7 +166,7 @@ pub async fn sync_package(
         PackageState {
             owner,
             repo,
-            installed_version: tag_name,
+            installed_version: release.tag_name,
         },
         state_root,
     )?;

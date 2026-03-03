@@ -10,11 +10,15 @@ pub struct Release {
     pub tarball_url: String,
 }
 
+pub struct FetchedRelease {
+    pub tag_name: String,
+    pub tarball_bytes: Bytes,
+}
+
 pub async fn fetch_latest_release(
     owner: &str,
     repo: &str,
-) -> Result<(String, Bytes), Box<dyn std::error::Error>> {
-    // Fetch the latest tag name and source code tarball from the GitHub repository
+) -> Result<FetchedRelease, Box<dyn std::error::Error>> {
     let release_url = Url::from_str(
         format!(
             "https://api.github.com/repos/{}/{}/releases/latest",
@@ -26,6 +30,7 @@ pub async fn fetch_latest_release(
     let client = Client::builder()
         .user_agent("raw-package-manager")
         .build()?;
+
     let release = client
         .get(release_url)
         .header("accept", "application/vnd.github+json")
@@ -35,7 +40,6 @@ pub async fn fetch_latest_release(
         .json::<Release>()
         .await?;
 
-    // Download the tarball
     let tarball = client
         .get(release.tarball_url)
         .send()
@@ -44,5 +48,8 @@ pub async fn fetch_latest_release(
         .bytes()
         .await?;
 
-    Ok((release.tag_name, tarball))
+    Ok(FetchedRelease {
+        tag_name: release.tag_name,
+        tarball_bytes: tarball,
+    })
 }
