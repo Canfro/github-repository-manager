@@ -1,7 +1,4 @@
 #!/usr/bin/bash
 
-# Move current directory to source code (real path is replaced at runtime, leave this as is)
-cd "{{SOURCE_CODE}}"
-
-#===================================================#
-# ↓ ↓ ↓  Write your build instructions here!  ↓ ↓ ↓ #
+# Write your build instructions here! Current working directory automatically gets moved to the
+# source code during sync, so just write as if it were it

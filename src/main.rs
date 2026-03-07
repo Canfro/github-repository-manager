@@ -1,5 +1,4 @@
 mod cli;
-mod config;
 mod data;
 mod error;
 mod github;

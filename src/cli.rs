@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "github-repository-manager")]
-#[command(about = "Manage gitHub repositories locally")]
+#[command(about = "Manage GitHub repositories locally")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,

@@ -10,10 +10,7 @@ use std::{
 use flate2::read::GzDecoder;
 use tar::Archive;
 
-use crate::{
-    config::{PackageConfig, load_config, save_config},
-    data::{PackageData, load_data, save_data},
-};
+use crate::data::{PackageData, load_data, save_data};
 
 pub fn list_packages(data_root: &Path) -> Result<(), GrmError> {
     for res in read_dir(data_root)? {
@@ -75,31 +72,6 @@ pub fn declare_package(
         );
     }
 
-    // Write package config file
-    if load_config(owner.as_str(), repo.as_str(), config_root).is_ok() {
-        println!(
-            "Already existing config file: {}/{}-{}.json",
-            config_dir.display(),
-            owner,
-            repo
-        );
-    } else {
-        save_config(
-            owner.as_str(),
-            repo.as_str(),
-            PackageConfig {
-                binaries_path: Vec::new(),
-            },
-            config_root,
-        )?;
-        println!(
-            "Created missing config file: {}/{}-{}.json",
-            config_dir.display(),
-            owner,
-            repo
-        );
-    }
-
     println!("Done!");
     Ok(())
 }
@@ -119,38 +91,30 @@ pub async fn sync_package(
         ))?;
     }
 
-    let release = fetch_latest_release(&owner, &repo).await?;
-
     let cache_dir = cache_root.join(format!("{}-{}", owner, repo));
-
     if cache_dir.exists() {
         remove_dir_all(cache_dir.as_path())?;
     }
     create_dir_all(cache_dir.as_path())?;
 
     // Extract the tarball
+    let release = fetch_latest_release(&owner, &repo).await?;
     let mut archive = Archive::new(GzDecoder::new(Cursor::new(release.tarball_bytes)));
     archive.set_overwrite(true);
     archive.unpack(cache_dir.as_path())?;
 
-    // Get the extracted subdirectory and replace in script
+    // Get the source code dir
     let config_dir = config_root.join(format!("{}-{}", owner, repo));
     let script_file = config_dir.join(format!("{}-{}.sh", owner, repo));
-    let script_content = read_to_string(script_file.as_path())?.replace(
-        "{{SOURCE_CODE}}",
-        read_dir(cache_dir.as_path())?
-            .filter_map(|res| res.ok())
-            .find(|entry| entry.file_type().map(|t| t.is_dir()).unwrap_or(false))
-            .ok_or("Tarball did not contain a root directory".to_string())?
-            .path()
-            .to_str()
-            .unwrap(),
-    );
-
-    write(script_file.as_path(), script_content)?;
+    let source_code_dir = read_dir(cache_dir.as_path())?
+        .filter_map(|res| res.ok())
+        .find(|entry| entry.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .ok_or("Tarball did not contain a root directory".to_string())?
+        .path();
 
     // Execute build script
     let script_status = Command::new("bash")
+        .current_dir(source_code_dir)
         .arg(script_file)
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
@@ -184,6 +148,7 @@ pub fn remove_package(
     config_root: &Path,
     config: bool,
 ) -> Result<(), GrmError> {
+    // TODO: Currently broken, need to find a way to remove the binary/binaries
     let package_config = match load_config(owner.as_str(), repo.as_str(), config_root) {
         Ok(config) => config,
         Err(GrmError::Io(io_err)) if io_err.kind() == ErrorKind::NotFound => {
